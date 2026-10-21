@@ -109,11 +109,30 @@ let tripStarted = false;
   }).addTo(map);
 
   function render() {
-    $('distance').textContent = (totalMeters / 1000).toFixed(2);
-    $('fare').textContent = Math.round(
-      (totalMeters / 1000) * RATE
-    ).toLocaleString('en-US');
+  $('distance').textContent =
+    (totalMeters / 1000).toFixed(2);
+
+  const distanceFare = (totalMeters / 1000) * rate;
+  const totalFare = (tripStarted ? BASE_FARE : 0)
+    + distanceFare;
+
+  $('fare').textContent =
+    Math.round(totalFare).toLocaleString('en-US');
+}
+  $('saveRate').addEventListener('click', () => {
+  const newRate = Number($('rateInput').value);
+
+  if (!Number.isFinite(newRate) || newRate < 0) {
+    alert('တစ်ကီလိုနှုန်းကို 0 သို့မဟုတ် အပေါင်းကိန်း ထည့်ပါ။');
+    return;
   }
+
+  rate = newRate;
+  render();
+  $('status').textContent =
+    'တစ်ကီလိုနှုန်း ' + rate.toLocaleString('en-US')
+    + ' ကျပ်ကို သတ်မှတ်ပြီးပါပြီ။';
+});
 
   function distanceBetween(a, b) {
     const R = 6371000;
@@ -266,7 +285,8 @@ let tripStarted = false;
         const c = position.coords;
 
         running = true;
-
+tripStarted = true;
+render();
         // ခရီးစတင်ချိန်တွင် ယခင် point ကို မသုံးပါ။
         lastPoint = null;
 
@@ -323,6 +343,7 @@ let tripStarted = false;
     if (running) return;
 
     totalMeters = 0;
+    tripStarted = false;
     lastPoint = null;
     routePoints = [];
 
