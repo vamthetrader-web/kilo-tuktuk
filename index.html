@@ -199,71 +199,85 @@ const MAX_GAP_SECONDS = 15;
     }
   }
 
-  function showPosition(position) {
-    const c = position.coords;
+  
+function showPosition(position) {
+  const c = position.coords;
 
-    const point = {
-      lat: c.latitude,
-      lng: c.longitude,
-      time: position.timestamp,
-      accuracy: c.accuracy
-    };
+  const point = {
+    lat: c.latitude,
+    lng: c.longitude,
+    time: position.timestamp,
+    accuracy: c.accuracy
+  };
 
-    updateMarker(point);
+  updateMarker(point);
 
-    $('gpsInfo').innerHTML =
-      'GPS တိကျမှု: ခန့်မှန်း ' +
-      Math.round(c.accuracy) +
-      ' မီတာ<br>' +
-      (running ? 'GPS တိုင်းတာနေသည်။' : 'ခရီးမစရသေးပါ။');
+  $('gpsInfo').innerHTML =
+    'GPS တိကျမှု: ခန့်မှန်း ' +
+    Math.round(c.accuracy) +
+    ' မီတာ<br>' +
+    (running ? 'GPS တိုင်းတာနေသည်။' : 'ခရီးမစရသေးပါ။');
 
-    if (!running) {
-      map.setView([point.lat, point.lng], 17);
-      return;
-    }
-
-    // မတိကျသော GPS point ကို ခရီးအကွာအဝေးတွက်ရာတွင် မသုံးပါ။
-    if (c.accuracy > MIN_ACCURACY) {
-      lastPoint = null;
-      setStatus('GPS တိကျမှုနည်းနေသည်။ Signal ကောင်းလာရန် စောင့်နေသည်။');
-      return;
-    }
-
-    if (!lastPoint) {
-      lastPoint = point;
-      routePoints.push([point.lat, point.lng]);
-      updateRoute();
-      return;
-    }
-
-    const delta = distanceBetween(lastPoint, point);
-    const elapsed = (point.time - lastPoint.time) / 1000;
-
-    // GPS update ကြာလွန်းပါက point အဟောင်းနဲ့ အကွာအဝေးမတွက်ပါ။
-    if (elapsed <= 0 || elapsed > MAX_GAP_SECONDS) {
-      lastPoint = point;
-      return;
-    }
-
-    // GPS တည်နေရာ အနည်းငယ်လှုပ်ခြင်းကို လျှော့ချပါ။
-    const noiseThreshold = Math.max(
-  MIN_MOVEMENT,
-  Math.min(4, (lastPoint.accuracy + point.accuracy) * 0.15)
-);
-
-    const speed = delta / elapsed;
-
-    if (delta >= noiseThreshold && speed <= MAX_SPEED_MPS) {
-      totalMeters += delta;
-      routePoints.push([point.lat, point.lng]);
-      updateRoute();
-      render();
-    }
-
-    // လက်ရှိ point ကို နောက်တစ်ကြိမ်တွက်ချက်မှု၏ အစမှတ်အဖြစ်သုံးပါ။
-    lastPoint = point;
-    setStatus('ခရီးစတင်ထားသည်။ GPS တိုင်းတာနေသည်။');
+  if (!running) {
+    map.setView([point.lat, point.lng], 17);
+    return;
   }
+
+  // GPS accuracy အရမ်းနည်းတဲ့ point ကို အကွာအဝေးတွက်ရာမှာ မသုံးပါ။
+  if (!Number.isFinite(point.accuracy) ||
+      point.accuracy <= 0 ||
+      point.accuracy > MIN_ACCURACY) {
+    setStatus('GPS signal ကို စောင့်နေသည်။');
+    return;
+  }
+
+  if (!lastPoint) {
+    lastPoint = point;
+    routePoints.push([point.lat, point.lng]);
+    updateRoute();
+    setStatus('GPS ရရှိပါပြီ။ ခရီးအကွာအဝေးကို တိုင်းတာနေသည်။');
+    return;
+  }
+
+  const elapsed = (point.time - lastPoint.time) / 1000;
+
+  // GPS အမှတ်ဟောင်းလွန်းလျှင် အမှတ်အသစ်өөс ပြန်စပါ။
+  if (elapsed <= 0 || elapsed > MAX_GAP_SECONDS) {
+    lastPoint = point;
+    setStatus('GPS ပြန်လည်ချိတ်ဆက်နေသည်။');
+    return;
+  }
+
+  // လက်ရှိအမှတ်နဲ့ နောက်ဆုံးလက်ခံထားတဲ့အမှတ်ကြား
+  // အကွာအဝေးကို တွက်ပါ။ အမှတ်တိုင်းကို ချက်ချင်းမရွှေ့ပါ။
+  const delta = distanceBetween(lastPoint, point);
+
+  const noiseThreshold = Math.max(
+    2,
+    Math.min(
+      4,
+      (lastPoint.accuracy + point.accuracy) * 0.2
+    )
+  );
+
+  const speed = delta / elapsed;
+
+  // အကွာအဝေးလုံလောက်ပြီး အမြန်နှုန်းလည်း ဖြစ်နိုင်ခြေရှိမှ လက်ခံပါ။
+  if (delta >= noiseThreshold && speed <= MAX_SPEED_MPS) {
+    totalMeters += delta;
+
+    routePoints.push([point.lat, point.lng]);
+    updateRoute();
+
+    // လက်ခံပြီးမှသာ နောက်ဆုံးအမှတ်ကို ရွှေ့ပါ။
+    lastPoint = point;
+
+    render();
+  }
+
+  setStatus('ခရီးစတင်ထားသည်။ GPS တိုင်းတာနေသည်။');
+}
+
 
   function gpsError(error) {
     let message = 'GPS မရပါ။ Location ခွင့်ပြုချက်နှင့် ဖုန်း၏ Location ကို စစ်ပါ။';
