@@ -501,7 +501,21 @@ const totalFare = calculateCurrentFare();
     setStatus(message);
   }
 
-  function stopWatching() {
+  function stopWatching()
+function startWatching() {
+  if (watchId !== null || !navigator.geolocation) return;
+
+  watchId = navigator.geolocation.watchPosition(
+    showPosition,
+    gpsError,
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000
+    }
+  );
+}
+ {
     if (watchId !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(watchId);
       watchId = null;
@@ -511,6 +525,7 @@ const totalFare = calculateCurrentFare();
       waitingTimer = null;
     }
   }
+  
 
   function clearRoute() {
     routePoints = [];
@@ -690,7 +705,6 @@ function endWaiting() {
   render();
 }
 
-  }
 
   $('start').addEventListener('click', () => {
     if (running || tripStarted) return;
@@ -721,15 +735,7 @@ function endWaiting() {
       render();
       showPosition(position);
 
-      watchId = navigator.geolocation.watchPosition(
-        showPosition,
-        gpsError,
-        {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 20000
-        }
-      );
+    startWatching();
     }, error => {
       $('start').disabled = false;
       gpsError(error);
@@ -760,17 +766,7 @@ isPaused = false;
 lastPoint = null;
 savePausedTripState();
 
-if (navigator.geolocation) {
-  watchId = navigator.geolocation.watchPosition(
-    showPosition,
-    gpsError,
-    {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 20000
-    }
-  );
-}
+startWatching();
       $('pause').textContent = '⏸ PAUSE';
       setStatus('ခရီးပြန်စပါပြီ။ GPS အကွာအဝေးကို ဆက်တိုင်းတာနေသည်။');
       $('gpsInfo').textContent = 'GPS တည်နေရာအသစ်ကို စောင့်နေသည်။';
@@ -782,12 +778,19 @@ if (navigator.geolocation) {
   $('stop').addEventListener('click', () => {
     if (!running) return;
 
-    endWaiting();
-    stopWatching();
+    
+endWaiting();
+stopWatching();
 
-    running = false;
-    isPaused = false;
-    lastPoint = null;
+running = false;
+isPaused = false;
+waitingStartedAt = null;
+lastPoint = null;
+
+try {
+  localStorage.removeItem(TRIP_STATE_KEY);
+} catch {}
+
 
     $('start').disabled = true;
     $('pause').disabled = true;
@@ -816,11 +819,19 @@ if (navigator.geolocation) {
     endWaiting();
     stopWatching();
 
-    totalMeters = 0;
-    waitingSeconds = 0;
-    tripStarted = false;
-    isPaused = false;
-    lastPoint = null;
+    
+totalMeters = 0;
+waitingSeconds = 0;
+waitingStartedAt = null;
+tripStarted = false;
+isPaused = false;
+running = false;
+lastPoint = null;
+
+try {
+  localStorage.removeItem(TRIP_STATE_KEY);
+} catch {}
+
 
     clearRoute();
 
