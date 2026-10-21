@@ -63,12 +63,15 @@ h2{font-size:17px;margin:20px 0 10px}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+
 (() => {
   const RATE = 1500;
   const MIN_ACCURACY_METERS = 35;
   const MIN_STEP_METERS = 3;
-  const MAX_SPEED_MPS = 45; // reject implausible GPS jumps
+  const MAX_SPEED_MPS = 45;
+
   const $ = id => document.getElementById(id);
+
   let watchId = null;
   let running = false;
   let totalMeters = 0;
@@ -78,104 +81,250 @@ h2{font-size:17px;margin:20px 0 10px}
   let routeLine = null;
 
   const map = L.map('map').setView([16.8661, 96.1951], 13);
+
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
 
   function render() {
     $('distance').textContent = (totalMeters / 1000).toFixed(2);
-    $('fare').textContent = Math.round((totalMeters / 1000) * RATE).toLocaleString('en-US');
+    $('fare').textContent = Math.round(
+      (totalMeters / 1000) * RATE
+    ).toLocaleString('en-US');
   }
 
   function distanceBetween(a, b) {
     const R = 6371000;
     const rad = d => d * Math.PI / 180;
+
     const dLat = rad(b.lat - a.lat);
     const dLon = rad(b.lng - a.lng);
-    const lat1 = rad(a.lat), lat2 = rad(b.lat);
-    const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
-    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+    const lat1 = rad(a.lat);
+    const lat2 = rad(b.lat);
+
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) *
+      Math.sin(dLon / 2) ** 2;
+
+    return 2 * R * Math.asin(
+      Math.min(1, Math.sqrt(h))
+    );
+  }
+
+  function updateMarker(point) {
+    const position = [point.lat, point.lng];
+
+    if (marker) {
+      marker.setLatLng(position);
+    } else {
+      marker = L.marker(position)
+        .addTo(map)
+        .bindPopup('လက်ရှိ GPS တည်နေရာ');
+    }
+  }
+
+  function updateRoute() {
+    if (routePoints.length < 2) return;
+
+    if (!routeLine) {
+      routeLine = L.polyline(routePoints, {
+        color: '#16a34a',
+        weight: 5
+      }).addTo(map);
+    } else {
+      routeLine.setLatLngs(routePoints);
+    }
   }
 
   function showPosition(position) {
     const c = position.coords;
-    const point = {lat: c.latitude, lng: c.longitude, time: position.timestamp, accuracy: c.accuracy};
-    $('gpsInfo').innerHTML = 'GPS တိကျမှု: ခန့်မှန်း ' + Math.round(c.accuracy) + ' မီတာ' +
-      '<br>' + (running ? 'GPS တိုင်းတာနေသည်။' : 'လက်ရှိတည်နေရာကို ပြထားသည်။');
 
-    if (marker) marker.setLatLng([point.lat, point.lng]);
-    else marker = L.marker([point.lat, point.lng]).addTo(map).bindPopup('လက်ရှိ GPS တည်နေရာ');
-    if (!lastPoint) map.setView([point.lat, point.lng], 17);
+    const point = {
+      lat: c.latitude,
+      lng: c.longitude,
+      time: position.timestamp,
+      accuracy: c.accuracy
+    };
 
-    if (running && c.accuracy <= MIN_ACCURACY_METERS) {
-      if (lastPoint) {
-        const delta = distanceBetween(lastPoint, point);
-        const elapsed = Math.max(0.5, (point.time - lastPoint.time) / 1000);
-        const speed = delta / elapsed;
-        // Ignore tiny GPS jitter and implausible location jumps.
-        if (delta >= MIN_STEP_METERS && speed <= MAX_SPEED_MPS) {
-          totalMeters += delta;
-          routePoints.push([point.lat, point.lng]);
-          if (!routeLine) routeLine = L.polyline(routePoints, {color:'#16a34a', weight:5}).addTo(map);
-          else routeLine.setLatLngs(routePoints);
-          render();
-        }
-      }
-      lastPoint = point;
-    } else if (!running) {
-      // Keep map location fresh while idle; never add distance.
-      lastPoint = point;
+    updateMarker(point);
+
+    $('gpsInfo').innerHTML =
+      'GPS တိကျမှု: ခန့်မှန်း ' +
+      Math.round(c.accuracy) +
+      ' မီတာ<br>' +
+      (running
+        ? 'GPS တိုင်းတာနေသည်။'
+        : 'လက်ရှိတည်နေရာကို ပြထားသည်။');
+
+    if (!running) {
+      map.setView([point.lat, point.lng], 17);
+      return;
     }
+
+    // GPS တိကျမှုမကောင်းလျှင် အကွာအဝေးမတွက်ပါ။
+    // နောက်ထပ်တိကျသော point ကို အစမှတ်အသစ်အဖြစ်ယူပါမည်။
+    if (c.accuracy > MIN_ACCURACY_METERS) {
+      lastPoint = null;
+      $('status').textContent =
+        'GPS တိကျမှုနည်းနေသည်။ Signal ကောင်းလာရန် စောင့်နေသည်။';
+      return;
+    }
+
+    if (lastPoint) {
+      const delta = distanceBetween(lastPoint, point);
+      const elapsed = Math.max(
+        0.5,
+        (point.time - lastPoint.time) / 1000
+      );
+      const speed = delta / elapsed;
+
+      if (
+        delta >= MIN_STEP_METERS &&
+        speed <= MAX_SPEED_MPS
+      ) {
+        totalMeters += delta;
+        routePoints.push([point.lat, point.lng]);
+        updateRoute();
+        render();
+      }
+    } else {
+      // တိကျသော GPS point အသစ်ကို အစမှတ်အဖြစ် သတ်မှတ်ပါ။
+      routePoints.push([point.lat, point.lng]);
+      updateRoute();
+    }
+
+    lastPoint = point;
+
+    $('status').textContent =
+      'ခရီးစတင်ထားသည်။ GPS တိုင်းတာနေသည်။';
   }
 
   function gpsError(error) {
-    let message = 'GPS မရပါ။ Location ခွင့်ပြုချက်နှင့် ဖုန်း၏ Location Services ကို စစ်ပါ။';
-    if (error && error.code === 1) message = 'Location ခွင့်မပြုထားပါ။ iPhone Settings မှ Safari Location ကို Allow လုပ်ပါ။';
-    if (error && error.code === 3) message = 'GPS တုံ့ပြန်ချိန်ကုန်သွားပါသည်။ ကောင်းကင်မြင်ရသောနေရာတွင် ထပ်စမ်းပါ။';
+    let message =
+      'GPS မရပါ။ Location ခွင့်ပြုချက်နှင့် ဖုန်း၏ Location ကို စစ်ပါ။';
+
+    if (error && error.code === 1) {
+      message =
+        'Location ခွင့်မပြုထားပါ။ Browser Settings မှ Location ကို Allow လုပ်ပါ။';
+    } else if (error && error.code === 2) {
+      message =
+        'GPS တည်နေရာမရသေးပါ။ အပြင်ဘက်မှာ ထပ်စမ်းပါ။';
+    } else if (error && error.code === 3) {
+      message =
+        'GPS တုံ့ပြန်ချိန်ကုန်သွားသည်။ Signal ကောင်းသောနေရာတွင် ထပ်စမ်းပါ။';
+    }
+
     $('status').textContent = message;
+  }
+
+  function stopWatching() {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
   }
 
   $('start').addEventListener('click', () => {
     if (running) return;
+
     if (!navigator.geolocation) {
-      $('status').textContent = 'ဤ browser တွင် GPS မရနိုင်ပါ။ Safari မှ HTTPS website ကို ဖွင့်ပါ။';
+      $('status').textContent =
+        'ဤ browser တွင် GPS မရနိုင်ပါ။ HTTPS website ကို ဖွင့်ပါ။';
       return;
     }
-    $('status').textContent = 'GPS ကို ရှာနေသည်။ Location ခွင့်ပြုပါ...';
-    navigator.geolocation.getCurrentPosition(pos => {
-      running = true;
-      lastPoint = {lat:pos.coords.latitude, lng:pos.coords.longitude, time:pos.timestamp, accuracy:pos.coords.accuracy};
-      $('status').textContent = 'ခရီးစတင်ပါပြီ။ GPS တိုင်းတာနေသည်။';
-      $('start').disabled = true;
-      $('stop').disabled = false;
-      $('reset').disabled = true;
-      showPosition(pos);
-      watchId = navigator.geolocation.watchPosition(showPosition, gpsError, {
-        enableHighAccuracy:true, maximumAge:1000, timeout:20000
-      });
-    }, gpsError, {enableHighAccuracy:true, maximumAge:0, timeout:20000});
+
+    $('status').textContent =
+      'GPS ကို ရှာနေသည်။ Location ခွင့်ပြုပါ...';
+
+    $('start').disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const c = position.coords;
+
+        running = true;
+
+        // ခရီးစတင်ချိန်တွင် ယခင် point ကို မသုံးပါ။
+        lastPoint = null;
+
+        $('stop').disabled = false;
+        $('reset').disabled = true;
+
+        showPosition(position);
+        map.setView([c.latitude, c.longitude], 17);
+
+        watchId = navigator.geolocation.watchPosition(
+          showPosition,
+          error => {
+            gpsError(error);
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 1000,
+            timeout: 20000
+          }
+        );
+      },
+      error => {
+        $('start').disabled = false;
+        gpsError(error);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 20000
+      }
+    );
   });
 
   $('stop').addEventListener('click', () => {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    watchId = null; running = false; lastPoint = null;
-    $('status').textContent = 'ခရီးပြီးဆုံးပါပြီ။ နောက်ဆုံးကျသင့်ငွေကို အောက်တွင်ကြည့်ပါ။';
-    $('start').disabled = false; $('stop').disabled = true; $('reset').disabled = false;
-    $('gpsInfo').innerHTML = 'GPS တိုင်းတာမှု ရပ်ထားသည်။<br>နောက်ဆုံးတွက်ချက်မှုကို သိမ်းဆည်းပြထားသည်။';
+    if (!running) return;
+
+    stopWatching();
+    running = false;
+    lastPoint = null;
+
+    $('status').textContent =
+      'ခရီးပြီးဆုံးပါပြီ။ နောက်ဆုံးကျသင့်ငွေကို အောက်တွင်ကြည့်ပါ။';
+
+    $('start').disabled = false;
+    $('stop').disabled = true;
+    $('reset').disabled = false;
+
+    $('gpsInfo').innerHTML =
+      'GPS တိုင်းတာမှု ရပ်ထားသည်။<br>' +
+      'နောက်ဆုံးတွက်ချက်မှုကို ပြထားသည်။';
   });
 
   $('reset').addEventListener('click', () => {
     if (running) return;
-    totalMeters = 0; lastPoint = null; routePoints = [];
-    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+
+    totalMeters = 0;
+    lastPoint = null;
+    routePoints = [];
+
+    if (routeLine) {
+      map.removeLayer(routeLine);
+      routeLine = null;
+    }
+
     render();
-    $('status').textContent = 'ခရီးအသစ်အတွက် အဆင်သင့်ဖြစ်ပါပြီ။ START ကိုနှိပ်ပါ။';
-    $('gpsInfo').innerHTML = 'GPS တိကျမှု: —<br>ခရီးမစရသေးပါ။';
+
+    $('status').textContent =
+      'ခရီးအသစ်အတွက် အဆင်သင့်ဖြစ်ပါပြီ။ START ကိုနှိပ်ပါ။';
+
+    $('gpsInfo').innerHTML =
+      'GPS တိကျမှု: —<br>ခရီးမစရသေးပါ။';
   });
+
+  window.addEventListener('pagehide', stopWatching);
 
   render();
 })();
+
 </script>
 </body>
 </html>
