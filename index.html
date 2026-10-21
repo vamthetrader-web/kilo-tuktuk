@@ -205,11 +205,47 @@ button {
 
 
   <div class="status" id="status">စတင်ရန် START ကိုနှိပ်ပြီး Location ခွင့်ပြုပါ။</div>
+  
+<div class="meter-card">
   <div class="fare-label">သွားခဲ့သော အကွာအဝေး</div>
-  <div class="distance"><span id="distance">0.00</span> <span class="unit">km</span></div>
+  <div class="distance">
+    <span id="distance">0.00</span>
+    <span class="unit">km</span>
+  </div>
+
   <div class="divider"></div>
+
   <div class="fare-label">ကျသင့်ငွေ စုစုပေါင်း</div>
-<div class="fare"><span id="fare">0</span> ကျပ်</div>
+  <div class="fare">
+    <span id="fare">0</span> ကျပ်
+  </div>
+
+  <div class="fare-label">
+    စတက်ခနှင့် တစ်ကီလိုနှုန်းကို Settings မှ ပြင်နိုင်သည်။
+  </div>
+</div>
+
+<div class="buttons">
+  <button id="start" class="start">▶ START</button>
+  <button id="stop" class="stop" disabled>■ STOP</button>
+</div>
+
+<div class="reset-row">
+  <button id="reset" class="reset">RESET · ခရီးအသစ်</button>
+</div>
+
+<button id="mapToggle" class="map-toggle" type="button">
+  🗺 မြေပုံကြည့်ရန်
+</button>
+
+<div id="mapPanel" class="map-panel">
+  <div id="map" aria-label="GPS map"></div>
+</div>
+
+<div class="info" id="gpsInfo">
+  GPS တိကျမှု: —<br>ခရီးမစရသေးပါ။
+</div>
+
   <div class="buttons">
     <button id="start" class="start">▶ START</button>
     <button id="stop" class="stop" disabled>■ STOP</button>
