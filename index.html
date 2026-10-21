@@ -273,10 +273,10 @@
   const DEFAULT_BASE_FARE = 3000;
   const DEFAULT_RATE = 1500;
 
-  const MIN_ACCURACY = 25;       
-  const MIN_MOVEMENT = 2.5;      
-  const MAX_SPEED_MPS = 15;      
-  const MAX_GAP_SECONDS = 15;    
+const MIN_ACCURACY = 35;
+const MIN_MOVEMENT = 1.5;
+const MAX_SPEED_MPS = 15;
+const MAX_GAP_SECONDS = 25;    
 
   const $ = id => document.getElementById(id);
   const fmt = n => Math.round(n).toLocaleString('en-US');
@@ -440,8 +440,7 @@
     const speed = delta / elapsed;
 
     if (delta >= accuracyThreshold && speed <= MAX_SPEED_MPS) {
-      const creditedMeters = Math.max(0, delta - Math.min(1.5, accuracyThreshold * 0.25));
-      totalMeters += creditedMeters;
+      totalMeters += delta;
       routePoints.push([point.lat, point.lng]);
       updateRoute();
       lastPoint = point;
