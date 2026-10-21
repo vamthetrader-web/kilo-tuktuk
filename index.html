@@ -124,11 +124,10 @@ h2{font-size:17px;margin:20px 0 10px}
   const DEFAULT_BASE_FARE = 3000;
   const DEFAULT_RATE = 1500;
 
-  const MIN_ACCURACY = 20;
-  const MIN_MOVEMENT = 4;
-  const MAX_SPEED_MPS = 12;
-  const MAX_GAP_SECONDS = 8;
-
+  const MIN_ACCURACY = 35;
+const MIN_MOVEMENT = 1.5;
+const MAX_SPEED_MPS = 15;
+const MAX_GAP_SECONDS = 15;
   const $ = id => document.getElementById(id);
 
   function loadSetting(key, fallback) {
@@ -266,9 +265,9 @@ h2{font-size:17px;margin:20px 0 10px}
 
     // GPS တည်နေရာ အနည်းငယ်လှုပ်ခြင်းကို လျှော့ချပါ။
     const noiseThreshold = Math.max(
-      MIN_MOVEMENT,
-      Math.min(8, (lastPoint.accuracy + point.accuracy) * 0.35)
-    );
+  MIN_MOVEMENT,
+  Math.min(4, (lastPoint.accuracy + point.accuracy) * 0.15)
+);
 
     const speed = delta / elapsed;
 
