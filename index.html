@@ -83,7 +83,9 @@ h2{font-size:17px;margin:20px 0 10px}
 <script>
 
 (() => {
-  const RATE = 1500;
+  const BASE_FARE = 3000;
+let rate = 1500;
+let tripStarted = false;
   const MIN_ACCURACY_METERS = 35;
   const MIN_STEP_METERS = 3;
   const MAX_SPEED_MPS = 45;
