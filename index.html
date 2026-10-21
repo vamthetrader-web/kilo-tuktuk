@@ -488,6 +488,20 @@ function showPosition(position) {
     }
   }
 
+  // မြေပုံကို ခလုတ်နှိပ်မှ ဖွင့်/ပိတ်ရန်
+  $('mapToggle').addEventListener('click', () => {
+    const panel = $('mapPanel');
+    const isOpen = panel.classList.toggle('open');
+
+    $('mapToggle').textContent = isOpen
+      ? '✕ မြေပုံပိတ်ရန်'
+      : '🗺 မြေပုံကြည့်ရန်';
+
+    if (isOpen) {
+      setTimeout(() => map.invalidateSize(), 100);
+    }
+  });
+
   // Settings
   $('settingsBtn').addEventListener('click', () => {
     $('baseFareInput').value = baseFare;
