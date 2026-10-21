@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#16a34a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Kilo TukTuk">
+  <title>Kilo TukTuk — GPS Taxi Meter</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --green: #16a34a;
+      --green-dark: #166534;
+      --red: #dc2626;
+      --amber: #d97706;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --surface: #fff;
+      --page: #f1f5f9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button, input { font: inherit; }
+    button {
+      border: 0;
+      border-radius: 15px;
+      min-height: 50px;
+      padding: 12px 14px;
+      font-size: 15px;
+      font-weight: 750;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    button:disabled { opacity: .48; cursor: not-allowed; }
+    .app {
+      width: min(100%, 540px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 20px 18px calc(28px + env(safe-area-inset-bottom));
+      background: #f8fafc;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    h1 { margin: 0; font-size: 22px; letter-spacing: -.7px; color: #14532d; }
+    .subtitle { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .header-btns { display: flex; gap: 6px; }
+    .top-btn { flex: 0 0 auto; background: #e2e8f0; color: #334155; min-height: 40px; padding: 8px 10px; font-size: 13px; }
+    .status {
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      background: #ecfdf5;
+      color: var(--green-dark);
+      border: 1px solid #bbf7d0;
+      border-radius: 13px;
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+    .meter-card {
+      padding: 22px 18px 18px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: 0 8px 26px #0f172a08;
+    }
+    .eyebrow { color: var(--muted); font-size: 13px; }
+    .distance {
+      margin-top: 7px;
+      color: #0f172a;
+      font-size: clamp(42px, 12vw, 58px);
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: -1.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .unit { color: var(--muted); font-size: 17px; font-weight: 600; letter-spacing: 0; }
+    .divider { height: 1px; margin: 20px 0; background: var(--line); }
+    .fare {
+      margin: 5px 0 4px;
+      color: var(--green);
+      font-size: clamp(28px, 8vw, 34px);
+      font-weight: 850;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+      font-variant-numeric: tabular-nums;
+    }
+    .sub-info {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .buttons { display: flex; gap: 8px; margin-top: 18px; }
+    .buttons button { flex: 1; padding: 12px 8px; font-size: 14px; }
+    .start { background: var(--green); color: white; }
+    .pause { background: var(--amber); color: white; }
+    .stop { background: var(--red); color: white; }
+    .reset-row { display: flex; justify-content: center; margin: 12px 0 0; }
+    .reset { min-height: 40px; max-width: 220px; background: #e2e8f0; color: #334155; font-size: 13px; }
+    .map-toggle {
+      width: 100%;
+      margin-top: 15px;
+      background: white;
+      color: var(--green-dark);
+      border: 1px solid #bbf7d0;
+    }
+    .map-panel {
+      display: none;
+      margin-top: 12px;
+      padding: 10px;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    .map-panel.open { display: block; }
+    #map { width: 100%; height: 300px; border-radius: 12px; z-index: 1; }
+    .info {
+      margin-top: 12px;
+      padding: 11px 12px;
+      background: #f1f5f9;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .note { margin: 14px 2px 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      padding: 18px;
+      overflow: auto;
+      background: #0f172a88;
+    }
+    .modal.open { display: block; }
+    .modal-card {
+      width: min(100%, 420px);
+      margin: max(24px, 7vh) auto;
+      padding: 22px;
+      border-radius: 20px;
+      background: white;
+      color: var(--ink);
+      box-shadow: 0 20px 60px #0002;
+    }
+    .modal-card h2 { margin: 0 0 18px; font-size: 20px; }
+    .field-label { display: block; margin-bottom: 6px; color: #334155; font-size: 13px; font-weight: 700; }
+    .field {
+      width: 100%;
+      min-height: 48px;
+      margin-bottom: 16px;
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 11px;
+      background: white;
+      color: var(--ink);
+      font-size: 16px;
+    }
+    .modal-actions { display: flex; gap: 10px; }
+    .modal-actions button { flex: 1; }
+    .save { background: var(--green); color: white; }
+    .close { background: #e2e8f0; color: #334155; }
+    .settings-note { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+    /* History List Styles */
+    .history-list { max-height: 300px; overflow-y: auto; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
+    .history-item { padding: 12px; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; }
+    .history-item-header { display: flex; justify-content: space-between; font-weight: bold; color: var(--green-dark); margin-bottom: 4px; }
+    .history-item-details { color: var(--muted); display: flex; justify-content: space-between; }
+    .clear-btn { background: var(--red); color: white; width: 100%; margin-top: 5px; }
+
+    @media (min-width: 600px) {
+      .app { min-height: auto; margin: 20px auto; border: 1px solid var(--line); border-radius: 24px; }
+    }
+  </style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <div>
+      <h1>Kilo TukTuk</h1>
+      <div class="subtitle">GPS Taxi Meter · ခရီးမီတာ</div>
+    </div>
+    <div class="header-btns">
+      <button id="historyBtn" class="top-btn" type="button">📜 မှတ်တမ်း</button>
+      <button id="settingsBtn" class="top-btn" type="button">⚙ ဈေးနှုန်း</button>
+    </div>
+  </header>
+
+  <div class="status" id="status" role="status" aria-live="polite">
+    စတင်ရန် START ကိုနှိပ်ပြီး Location ခွင့်ပြုပါ။
+  </div>
+
+  <section class="meter-card" aria-label="ခရီးမီတာ">
+    <div class="eyebrow">သွားခဲ့သော အကွာအဝေး</div>
+    <div class="distance"><span id="distance">0.00</span> <span class="unit">km</span></div>
+    <div class="divider"></div>
+    <div class="eyebrow">ကျသင့်ငွေ စုစုပေါင်း</div>
+    <div class="fare"><span id="fare">0</span> <span class="unit">ကျပ်</span></div>
+    <div class="sub-info" id="subInfo">စောင့်ဆိုင်းချိန်: 0 မိနစ် (အခမဲ့)</div>
+
+    <div class="buttons">
+      <button id="start" class="start" type="button">▶ START</button>
+      <button id="pause" class="pause" type="button" disabled>⏸ PAUSE</button>
+      <button id="stop" class="stop" type="button" disabled>■ STOP</button>
+    </div>
+    <div class="reset-row">
+      <button id="reset" class="reset" type="button">RESET · ခရီးအသစ်</button>
+    </div>
+
+    <button id="mapToggle" class="map-toggle" type="button" aria-expanded="false" aria-controls="mapPanel">🗺 မြေပုံကြည့်ရန်</button>
+    <div id="mapPanel" class="map-panel">
+      <div id="map" aria-label="GPS map"></div>
+    </div>
+    <div class="info" id="gpsInfo">GPS တိကျမှု: —<br>ခရီးမစရသေးပါ။</div>
+  </section>
+
+  <p class="note">
+    အသုံးပြုရန် — အပြင်ဘက်တွင် GPS signal ကောင်းချိန် START နှိပ်ပါ။ လမ်းတွင် ရပ်နားရန် PAUSE နှိပ်ပါ (မိနစ် ၂၀ ကျော်ပါက ၁ မိနစ် ၁၀၀ နှုန်းဖြင့် စောင့်ခ တွက်ပါမည်)။ မြေပုံ © OpenStreetMap contributors။
+  </p>
+</main>
+
+<!-- Settings Modal -->
+<div id="settingsPanel" class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <div class="modal-card">
+    <h2 id="settingsTitle">⚙ ဈေးနှုန်းသတ်မှတ်ရန်</h2>
+    <label class="field-label" for="baseFareInput">စတက်ခ (ကျပ်)</label>
+    <input id="baseFareInput" class="field" type="number" min="0" step="100" value="3000" inputmode="numeric">
+    <label class="field-label" for="rateInput">တစ်ကီလိုနှုန်း (ကျပ် / km)</label>
+    <input id="rateInput" class="field" type="number" min="0" step="100" value="1500" inputmode="numeric">
+    <div class="modal-actions">
+      <button id="saveSettings" class="save" type="button">သိမ်းမည်</button>
+      <button id="closeSettings" class="close" type="button">ပိတ်မည်</button>
+    </div>
+    <p class="settings-note">ဈေးနှုန်းများကို ဒီဖုန်း၏ Browser ထဲတွင် သိမ်းဆည်းထားပါမည်။</p>
+  </div>
+</div>
+
+<!-- History Modal -->
+<div id="historyPanel" class="modal" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+  <div class="modal-card">
+    <h2 id="historyTitle">📜 ခရီးစဉ်မှတ်တမ်းများ</h2>
+    <div id="historyList" class="history-list">
+      <!-- Dynamically filled -->
+    </div>
+    <button id="clearHistory" class="clear-btn" type="button">မှတ်တမ်းအားလုံး ဖျက်မည်</button>
+    <div class="modal-actions" style="margin-top: 10px;">
+      <button id="closeHistory" class="close" type="button">ပိတ်မည်</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  const DEFAULT_BASE_FARE = 3000;
+  const DEFAULT_RATE = 1500;
+
+  const MIN_ACCURACY = 25;       
+  const MIN_MOVEMENT = 2.5;      
+  const MAX_SPEED_MPS = 15;      
+  const MAX_GAP_SECONDS = 15;    
+
+  const $ = id => document.getElementById(id);
+  const fmt = n => Math.round(n).toLocaleString('en-US');
+
+  function loadSetting(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw === null) return fallback;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 ? n : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function loadHistory() {
+    try {
+      const raw = localStorage.getItem('kiloTripHistory');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveHistoryToStorage(history) {
+    try {
+      localStorage.setItem('kiloTripHistory', JSON.stringify(history));
+    } catch {}
+  }
+
+  let baseFare = loadSetting('kiloBaseFare', DEFAULT_BASE_FARE);
+  let rate = loadSetting('kiloRate', DEFAULT_RATE);
+  let tripHistory = loadHistory();
+
+  let watchId = null;
+  let running = false;
+  let isPaused = false;
+  let tripStarted = false;
+  let totalMeters = 0;
+  let waitingSeconds = 0;
+  let waitingTimer = null;
+  let lastPoint = null;
+  let routePoints = [];
+  let marker = null;
+  let routeLine = null;
+  let map = null;
+
+  function setStatus(message) { $('status').textContent = message; }
+
+  function calculateCurrentFare() {
+    const waitingMinutes = Math.floor(waitingSeconds / 60);
+    const chargeableWaitingMins = Math.max(0, waitingMinutes - 20);
+    const waitingCost = chargeableWaitingMins * 100;
+    const distanceCost = (tripStarted ? baseFare : 0) + (totalMeters / 1000) * rate;
+    return distanceCost + waitingCost;
+  }
+
+  function render() {
+    const km = totalMeters / 1000;
+    $('distance').textContent = km.toFixed(2);
+    
+    const waitingMinutes = Math.floor(waitingSeconds / 60);
+    const chargeableWaitingMins = Math.max(0, waitingMinutes - 20);
+    const waitingCost = chargeableWaitingMins * 100;
+    const totalFare = calculateCurrentFare();
+
+    $('fare').textContent = fmt(totalFare);
+    
+    if (waitingMinutes > 0) {
+      $('subInfo').textContent = `စောင့်ဆိုင်းချိန်: ${waitingMinutes} မိနစ် (စောင့်ခ: ${fmt(waitingCost)} ကျပ်)`;
+    } else {
+      $('subInfo').textContent = `စောင့်ဆိုင်းချိန်: 0 မိနစ် (အခမဲ့ မိနစ် ၂၀)`;
+    }
+  }
+
+  function distanceBetween(a, b) {
+    const R = 6371000;
+    const rad = d => d * Math.PI / 180;
+    const dLat = rad(b.lat - a.lat);
+    const dLon = rad(b.lng - a.lng);
+    const lat1 = rad(a.lat);
+    const lat2 = rad(b.lat);
+    const h = Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+
+  function updateMarker(point) {
+    if (!map) return;
+    const latlng = [point.lat, point.lng];
+    if (marker) marker.setLatLng(latlng);
+    else marker = L.marker(latlng).addTo(map).bindPopup('လက်ရှိ GPS တည်နေရာ');
+  }
+
+  function updateRoute() {
+    if (!map || routePoints.length < 2) return;
+    if (!routeLine) {
+      routeLine = L.polyline(routePoints, { color: '#16a34a', weight: 5 }).addTo(map);
+    } else {
+      routeLine.setLatLngs(routePoints);
+    }
+  }
+
+  function showPosition(position) {
+    if (isPaused || !running) return;
+    const c = position.coords;
+    const point = {
+      lat: c.latitude,
+      lng: c.longitude,
+      time: position.timestamp || Date.now(),
+      accuracy: c.accuracy
+    };
+
+    updateMarker(point);
+    $('gpsInfo').innerHTML = 'GPS တိကျမှု: ခန့်မှန်း ' +
+      (Number.isFinite(c.accuracy) ? Math.round(c.accuracy) : '—') +
+      ' မီတာ<br>GPS တိုင်းတာနေသည်။';
+
+    if (!Number.isFinite(point.accuracy) || point.accuracy <= 0 ||
+        point.accuracy > MIN_ACCURACY) {
+      setStatus('GPS signal မတိကျသေးပါ။ ပိုကောင်းတဲ့ GPS ကို စောင့်နေသည်။');
+      return;
+    }
+
+    if (!lastPoint) {
+      lastPoint = point;
+      routePoints.push([point.lat, point.lng]);
+      updateRoute();
+      if (map) map.setView([point.lat, point.lng], 17);
+      setStatus('GPS ရရှိပါပြီ။ ခရီးအကွာအဝေးကို တိုင်းတာနေသည်။');
+      return;
+    }
+
+    const elapsed = (point.time - lastPoint.time) / 1000;
+    if (elapsed <= 0 || elapsed > MAX_GAP_SECONDS) {
+      lastPoint = point;
+      setStatus('GPS ခဏပြတ်တောက်သွားသည်။ တည်နေရာအသစ်မှ ဆက်တိုင်းတာနေသည်။');
+      return;
+    }
+
+    const delta = distanceBetween(lastPoint, point);
+    const accuracyThreshold = Math.max(
+      MIN_MOVEMENT,
+      Math.min(5, (lastPoint.accuracy + point.accuracy) * 0.25)
+    );
+    const speed = delta / elapsed;
+
+    if (delta >= accuracyThreshold && speed <= MAX_SPEED_MPS) {
+      const creditedMeters = Math.max(0, delta - Math.min(1.5, accuracyThreshold * 0.25));
+      totalMeters += creditedMeters;
+      routePoints.push([point.lat, point.lng]);
+      updateRoute();
+      lastPoint = point;
+      render();
+    } else if (speed > MAX_SPEED_MPS) {
+      lastPoint = point;
+      setStatus('GPS တည်နေရာခုန်သွားမှုကို ဖယ်ထားပါသည်။');
+      return;
+    }
+
+    setStatus('ခရီးစတင်ထားသည်။ GPS တိုင်းတာနေသည်။');
+  }
+
+  function gpsError(error) {
+    let message = 'GPS မရပါ။ Location ခွင့်ပြုချက်နှင့် ဖုန်း၏ Location ကို စစ်ပါ။';
+    if (error && error.code === 1) {
+      message = 'Location ခွင့်မပြုထားပါ။ Browser/App Settings မှ Allow လုပ်ပါ။';
+    } else if (error && error.code === 2) {
+      message = 'GPS တည်နေရာမရသေးပါ။ အပြင်ဘက်တွင် ထပ်စမ်းပါ။';
+    } else if (error && error.code === 3) {
+      message = 'GPS တုံ့ပြန်ချိန်ကုန်သွားသည်။ ထပ်မံကြိုးစားပါ။';
+    }
+    setStatus(message);
+  }
+
+  function stopWatching() {
+    if (watchId !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    if (waitingTimer) {
+      clearInterval(waitingTimer);
+      waitingTimer = null;
+    }
+  }
+
+  function clearRoute() {
+    routePoints = [];
+    if (routeLine && map) map.removeLayer(routeLine);
+    routeLine = null;
+  }
+
+  if (window.L) {
+    map = L.map('map').setView([21.9588, 96.0891], 13);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+  }
+
+  $('mapToggle').addEventListener('click', () => {
+    const panel = $('mapPanel');
+    const isOpen = panel.classList.toggle('open');
+    $('mapToggle').textContent = isOpen ? '✕ မြေပုံပိတ်ရန်' : '🗺 မြေပုံကြည့်ရန်';
+    $('mapToggle').setAttribute('aria-expanded', String(isOpen));
+    if (isOpen && map) {
+      setTimeout(() => {
+        map.invalidateSize();
+        if (marker) map.panTo(marker.getLatLng());
+      }, 120);
+    }
+  });
+
+  // Settings Modal handlers
+  function openSettings() {
+    $('baseFareInput').value = String(baseFare);
+    $('rateInput').value = String(rate);$('settingsPanel').classList.add('open');
+  }
+  function closeSettings() { $('settingsPanel').classList.remove('open'); }
+
+  $('settingsBtn').addEventListener('click', openSettings);
+  $('closeSettings').addEventListener('click', closeSettings);$('settingsPanel').addEventListener('click', event => {
+    if (event.target === $('settingsPanel')) closeSettings();
+  });
+
+  // History Modal handlers
+  function renderHistoryList() {
+    const listEl = $('historyList');
+    if (tripHistory.length === 0) {
+      listEl.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 20px;">သိမ်းဆည်းထားသော မှတ်တမ်း မရှိသေးပါ။</div>';
+      return;
+    }
+    listEl.innerHTML = tripHistory.map(trip => `
+      <div class="history-item">
+        <div class="history-item-header">
+          <span>${trip.date}</span>
+          <span style="color: var(--green);">${fmt(trip.fare)} ကျပ်</span>
+        </div>
+        <div class="history-item-details">
+          <span>အကွာအဝေး: ${trip.distance} km</span>
+          <span>စောင့်ဆိုင်းချိန်: ${trip.waitingMins} မိနစ်</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function openHistory() {
+    renderHistoryList();
+    $('historyPanel').classList.add('open');
+  }
+  function closeHistory() { $('historyPanel').classList.remove('open'); }
+
+  $('historyBtn').addEventListener('click', openHistory);
+  $('closeHistory').addEventListener('click', closeHistory);$('historyPanel').addEventListener('click', event => {
+    if (event.target === $('historyPanel')) closeHistory();
+  });
+
+  $('clearHistory').addEventListener('click', () => {
+    if (confirm('မှတ်တမ်းအားလုံးကို ဖျက်ရန် သေချာပါသလား?')) {
+      tripHistory = [];
+      saveHistoryToStorage(tripHistory);
+      renderHistoryList();
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      closeSettings();
+      closeHistory();
+    }
+  });
+
+  $('saveSettings').addEventListener('click', () => {
+    const baseRaw = $('baseFareInput').value.trim();
+    const rateRaw = $('rateInput').value.trim();
+    const newBase = Number(baseRaw);
+    const newRate = Number(rateRaw);
+
+    if (baseRaw === '' || rateRaw === '' || !Number.isFinite(newBase) ||
+        !Number.isFinite(newRate) || newBase < 0 || newRate < 0) {
+      alert('စတက်ခနဲ့ တစ်ကီလိုနှုန်းကို 0 သို့မဟုတ် အပေါင်းကိန်း ထည့်ပါ။');
+      return;
+    }
+
+    baseFare = newBase;
+    rate = newRate;
+    try {
+      localStorage.setItem('kiloBaseFare', String(baseFare));
+      localStorage.setItem('kiloRate', String(rate));
+    } catch {}
+    render();
+    closeSettings();
+    setStatus('ဈေးနှုန်းသတ်မှတ်ချက်များကို သိမ်းပြီးပါပြီ။');
+  });
+
+  $('start').addEventListener('click', () => {
+    if (running) return;
+    if (!navigator.geolocation) {
+      setStatus('ဒီ Browser/App မှာ GPS မရနိုင်ပါ။');
+      return;
+    }
+
+    $('start').disabled = true;
+    setStatus('GPS ကို ရှာနေသည်။ Location ခွင့်ပြုပါ...');
+
+    navigator.geolocation.getCurrentPosition(position => {
+      totalMeters = 0;
+      waitingSeconds = 0;
+      clearRoute();
+      lastPoint = null;
+      tripStarted = true;
+      running = true;
+      isPaused = false;
+      
+      $('pause').disabled = false;
+      $('pause').textContent = '⏸ PAUSE';
+      $('stop').disabled = false;
+      $('reset').disabled = true;
+      render();
+      showPosition(position);
+
+      watchId = navigator.geolocation.watchPosition(showPosition, gpsError, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 20000
+      });
+    }, error => {
+      $('start').disabled = false;
+      gpsError(error);
+    }, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000
+    });
+  });
+
+  $('pause').addEventListener('click', () => {
+    if (!running) return;
+    isPaused = !isPaused;
+    if (isPaused) {
+      $('pause').textContent = '▶ RESUME';
+      setStatus('ခရီးစဉ် ခေတ္တရပ်နားနေသည် (Waiting Time စတင်ရေတွက်နေသည်)');
+      lastPoint = null; 
+      
+      if (!waitingTimer) {
+        waitingTimer = setInterval(() => {
+          waitingSeconds++;
+          render();
+        }, 1000);
+      }
+    } else {
+      $('pause').textContent = '⏸ PAUSE';
+      setStatus('ခရီးစဉ် ဆက်သွားနေပါပြီ...');
+      if (waitingTimer) {
+        clearInterval(waitingTimer);
+        waitingTimer = null;
+      }
+      lastPoint = null;
+    }
+  });
+
+  $('stop').addEventListener('click', () => {
+    if (!running) return;
+    stopWatching();
+    running = false;
+    isPaused = false;
+    
+    // Save trip to history
+    const finalKm = (totalMeters / 1000).toFixed(2);
+    const finalFare = calculateCurrentFare();
+    const waitingMins = Math.floor(waitingSeconds / 60);
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+    if (totalMeters > 0 || finalFare > 0) {
+      tripHistory.unshift({
+        date: dateStr,
+        distance: finalKm,
+        waitingMins: waitingMins,
+        fare: finalFare
+      });
+      // Keep only last 50 trips
+      if (tripHistory.length > 50) tripHistory.pop();
+      saveHistoryToStorage(tripHistory);
+    }
+
+    lastPoint = null;
+    $('start').disabled = false;
+    $('pause').disabled = true;
+    $('pause').textContent = '⏸ PAUSE';
+    $('stop').disabled = true;
+    $('reset').disabled = false;
+    setStatus('ခရီးပြီးဆုံးပါပြီ။ မှတ်တမ်းတွင် သိမ်းဆည်းပြီးပါပြီ။');
+    $('gpsInfo').innerHTML = 'GPS တိုင်းတာမှု ရပ်ထားသည်။<br>နောက်ဆုံးတွက်ချက်မှုကို ပြထားသည်။';
+    render();
+  });
+
+  $('reset').addEventListener('click', () => {
+    if (running) return;
+    totalMeters = 0;
+    waitingSeconds = 0;
+    tripStarted = false;
+    lastPoint = null;
+    clearRoute();
+    if (marker && map) {
+      map.removeLayer(marker);
+      marker = null;
+    }
+    render();
+    setStatus('ခရီးအသစ်အတွက် အဆင်သင့်ဖြစ်ပါပြီ။ START ကိုနှိပ်ပါ။');
+    $('gpsInfo').innerHTML = 'GPS တိကျမှု: —<br>ခရီးမစရသေးပါ။';
+  });
+
+  window.addEventListener('pagehide', stopWatching);
+  render();
+})();
+</script>
+</body>
+</html>
