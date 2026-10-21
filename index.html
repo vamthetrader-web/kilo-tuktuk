@@ -100,7 +100,8 @@
     }
     .sub-info {
       font-size: 13px;
-      color: var(--muted);
+      color: var(--amber);
+      font-weight: 700;
       margin-bottom: 10px;
     }
     .buttons { display: flex; gap: 8px; margin-top: 18px; }
@@ -177,7 +178,6 @@
     .close { background: #e2e8f0; color: #334155; }
     .settings-note { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 
-    /* History List Styles */
     .history-list { max-height: 300px; overflow-y: auto; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
     .history-item { padding: 12px; background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; }
     .history-item-header { display: flex; justify-content: space-between; font-weight: bold; color: var(--green-dark); margin-bottom: 4px; }
@@ -212,7 +212,7 @@
     <div class="divider"></div>
     <div class="eyebrow">ကျသင့်ငွေ စုစုပေါင်း</div>
     <div class="fare"><span id="fare">0</span> <span class="unit">ကျပ်</span></div>
-    <div class="sub-info" id="subInfo">စောင့်ဆိုင်းချိန်: 0 မိနစ် (အခမဲ့)</div>
+    <div class="sub-info" id="subInfo">စောင့်ဆိုင်းချိန်: 0 မိနစ် 0 စက္ကန့် (အခမဲ့)</div>
 
     <div class="buttons">
       <button id="start" class="start" type="button">▶ START</button>
@@ -338,17 +338,32 @@
     const km = totalMeters / 1000;
     $('distance').textContent = km.toFixed(2);
     
-    const waitingMinutes = Math.floor(waitingSeconds / 60);
-    const chargeableWaitingMins = Math.max(0, waitingMinutes - 20);
+    const hrs = Math.floor(waitingSeconds / 3600);
+    const mins = Math.floor((waitingSeconds % 3600) / 60);
+    const secs = waitingSeconds % 60;
+
+    const waitingMinutesTotal = Math.floor(waitingSeconds / 60);
+    const chargeableWaitingMins = Math.max(0, waitingMinutesTotal - 20);
     const waitingCost = chargeableWaitingMins * 100;
     const totalFare = calculateCurrentFare();
 
     $('fare').textContent = fmt(totalFare);
     
-    if (waitingMinutes > 0) {
-      $('subInfo').textContent = `စောင့်ဆိုင်းချိန်: ${waitingMinutes} မိနစ် (စောင့်ခ: ${fmt(waitingCost)} ကျပ်)`;
+    let timeStr = '';
+    if (hrs > 0) {
+      timeStr = `${hrs} နာရီ ${mins} မိနစ် ${secs} စက္ကန့်`;
     } else {
-      $('subInfo').textContent = `စောင့်ဆိုင်းချိန်: 0 မိနစ် (အခမဲ့ မိနစ် ၂၀)`;
+      timeStr = `${mins} မိနစ် ${secs} စက္ကန့်`;
+    }
+
+    if (waitingSeconds > 0) {
+      if (chargeableWaitingMins > 0) {
+        $('subInfo').textContent = `စောင့်ဆိုင်းချိန်: ${timeStr} (စောင့်ခ: ${fmt(waitingCost)} ကျပ်)`;
+      } else {
+        $('subInfo').textContent = `စောင့်ဆိုင်းချိန်: ${timeStr} (အခမဲ့ မိနစ် ၂၀)`;
+      }
+    } else {
+      $('subInfo').textContent = `စောင့်ဆိုင်းချိန်: 0 မိနစ် 0 စက္ကန့် (အခမဲ့ မိနစ် ၂၀)`;
     }
   }
 
@@ -490,209 +505,10 @@
     }
   });
 
-  // Settings Modal handlers
   function openSettings() {
     $('baseFareInput').value = String(baseFare);
     $('rateInput').value = String(rate);$('settingsPanel').classList.add('open');
   }
   function closeSettings() { $('settingsPanel').classList.remove('open'); }
 
-  $('settingsBtn').addEventListener('click', openSettings);
-  $('closeSettings').addEventListener('click', closeSettings);$('settingsPanel').addEventListener('click', event => {
-    if (event.target === $('settingsPanel')) closeSettings();
-  });
-
-  // History Modal handlers
-  function renderHistoryList() {
-    const listEl = $('historyList');
-    if (tripHistory.length === 0) {
-      listEl.innerHTML = '<div style="text-align: center; color: var(--muted); padding: 20px;">သိမ်းဆည်းထားသော မှတ်တမ်း မရှိသေးပါ။</div>';
-      return;
-    }
-    listEl.innerHTML = tripHistory.map(trip => `
-      <div class="history-item">
-        <div class="history-item-header">
-          <span>${trip.date}</span>
-          <span style="color: var(--green);">${fmt(trip.fare)} ကျပ်</span>
-        </div>
-        <div class="history-item-details">
-          <span>အကွာအဝေး: ${trip.distance} km</span>
-          <span>စောင့်ဆိုင်းချိန်: ${trip.waitingMins} မိနစ်</span>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  function openHistory() {
-    renderHistoryList();
-    $('historyPanel').classList.add('open');
-  }
-  function closeHistory() { $('historyPanel').classList.remove('open'); }
-
-  $('historyBtn').addEventListener('click', openHistory);
-  $('closeHistory').addEventListener('click', closeHistory);$('historyPanel').addEventListener('click', event => {
-    if (event.target === $('historyPanel')) closeHistory();
-  });
-
-  $('clearHistory').addEventListener('click', () => {
-    if (confirm('မှတ်တမ်းအားလုံးကို ဖျက်ရန် သေချာပါသလား?')) {
-      tripHistory = [];
-      saveHistoryToStorage(tripHistory);
-      renderHistoryList();
-    }
-  });
-
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') {
-      closeSettings();
-      closeHistory();
-    }
-  });
-
-  $('saveSettings').addEventListener('click', () => {
-    const baseRaw = $('baseFareInput').value.trim();
-    const rateRaw = $('rateInput').value.trim();
-    const newBase = Number(baseRaw);
-    const newRate = Number(rateRaw);
-
-    if (baseRaw === '' || rateRaw === '' || !Number.isFinite(newBase) ||
-        !Number.isFinite(newRate) || newBase < 0 || newRate < 0) {
-      alert('စတက်ခနဲ့ တစ်ကီလိုနှုန်းကို 0 သို့မဟုတ် အပေါင်းကိန်း ထည့်ပါ။');
-      return;
-    }
-
-    baseFare = newBase;
-    rate = newRate;
-    try {
-      localStorage.setItem('kiloBaseFare', String(baseFare));
-      localStorage.setItem('kiloRate', String(rate));
-    } catch {}
-    render();
-    closeSettings();
-    setStatus('ဈေးနှုန်းသတ်မှတ်ချက်များကို သိမ်းပြီးပါပြီ။');
-  });
-
-  $('start').addEventListener('click', () => {
-    if (running) return;
-    if (!navigator.geolocation) {
-      setStatus('ဒီ Browser/App မှာ GPS မရနိုင်ပါ။');
-      return;
-    }
-
-    $('start').disabled = true;
-    setStatus('GPS ကို ရှာနေသည်။ Location ခွင့်ပြုပါ...');
-
-    navigator.geolocation.getCurrentPosition(position => {
-      totalMeters = 0;
-      waitingSeconds = 0;
-      clearRoute();
-      lastPoint = null;
-      tripStarted = true;
-      running = true;
-      isPaused = false;
-      
-      $('pause').disabled = false;
-      $('pause').textContent = '⏸ PAUSE';
-      $('stop').disabled = false;
-      $('reset').disabled = true;
-      render();
-      showPosition(position);
-
-      watchId = navigator.geolocation.watchPosition(showPosition, gpsError, {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 20000
-      });
-    }, error => {
-      $('start').disabled = false;
-      gpsError(error);
-    }, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 20000
-    });
-  });
-
-  $('pause').addEventListener('click', () => {
-    if (!running) return;
-    isPaused = !isPaused;
-    if (isPaused) {
-      $('pause').textContent = '▶ RESUME';
-      setStatus('ခရီးစဉ် ခေတ္တရပ်နားနေသည် (Waiting Time စတင်ရေတွက်နေသည်)');
-      lastPoint = null; 
-      
-      if (!waitingTimer) {
-        waitingTimer = setInterval(() => {
-          waitingSeconds++;
-          render();
-        }, 1000);
-      }
-    } else {
-      $('pause').textContent = '⏸ PAUSE';
-      setStatus('ခရီးစဉ် ဆက်သွားနေပါပြီ...');
-      if (waitingTimer) {
-        clearInterval(waitingTimer);
-        waitingTimer = null;
-      }
-      lastPoint = null;
-    }
-  });
-
-  $('stop').addEventListener('click', () => {
-    if (!running) return;
-    stopWatching();
-    running = false;
-    isPaused = false;
-    
-    // Save trip to history
-    const finalKm = (totalMeters / 1000).toFixed(2);
-    const finalFare = calculateCurrentFare();
-    const waitingMins = Math.floor(waitingSeconds / 60);
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-    if (totalMeters > 0 || finalFare > 0) {
-      tripHistory.unshift({
-        date: dateStr,
-        distance: finalKm,
-        waitingMins: waitingMins,
-        fare: finalFare
-      });
-      // Keep only last 50 trips
-      if (tripHistory.length > 50) tripHistory.pop();
-      saveHistoryToStorage(tripHistory);
-    }
-
-    lastPoint = null;
-    $('start').disabled = false;
-    $('pause').disabled = true;
-    $('pause').textContent = '⏸ PAUSE';
-    $('stop').disabled = true;
-    $('reset').disabled = false;
-    setStatus('ခရီးပြီးဆုံးပါပြီ။ မှတ်တမ်းတွင် သိမ်းဆည်းပြီးပါပြီ။');
-    $('gpsInfo').innerHTML = 'GPS တိုင်းတာမှု ရပ်ထားသည်။<br>နောက်ဆုံးတွက်ချက်မှုကို ပြထားသည်။';
-    render();
-  });
-
-  $('reset').addEventListener('click', () => {
-    if (running) return;
-    totalMeters = 0;
-    waitingSeconds = 0;
-    tripStarted = false;
-    lastPoint = null;
-    clearRoute();
-    if (marker && map) {
-      map.removeLayer(marker);
-      marker = null;
-    }
-    render();
-    setStatus('ခရီးအသစ်အတွက် အဆင်သင့်ဖြစ်ပါပြီ။ START ကိုနှိပ်ပါ။');
-    $('gpsInfo').innerHTML = 'GPS တိကျမှု: —<br>ခရီးမစရသေးပါ။';
-  });
-
-  window.addEventListener('pagehide', stopWatching);
-  render();
-})();
-</script>
-</body>
-</html>
+  $('settingsBtn').addEventListener('click', openSettings);$('closeSettings').addEventListener
