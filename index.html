@@ -47,7 +47,25 @@ h2{font-size:17px;margin:20px 0 10px}
   <div class="fare-label">သွားခဲ့သော အကွာအဝေး</div>
   <div class="distance"><span id="distance">0.00</span> <span class="unit">km</span></div>
   <div class="divider"></div>
-  <div class="fare-label">ကျသင့်နှုန်း · 1,500 ကျပ် / km</div>
+  <div class="fare-label">စတက်ခ</div>
+<div style="font-size:18px;font-weight:700;margin:5px 0 14px">
+  3,000 ကျပ်
+</div>
+
+<div class="fare-label">တစ်ကီလိုနှုန်း (ကျပ် / km)</div>
+<div style="display:flex;gap:8px;margin:8px 0 14px">
+  <input id="rateInput" type="number" min="0" step="100"
+    value="1500" inputmode="numeric"
+    aria-label="တစ်ကီလိုနှုန်း"
+    style="width:100%;padding:12px;border:1px solid #d4d4d4;border-radius:10px;font-size:16px">
+  <button id="saveRate" type="button"
+    style="flex:0 0 95px;background:#525252;min-height:44px">
+    သိမ်းမည်
+  </button>
+</div>
+
+<div class="fare-label">ကျသင့်ငွေ စုစုပေါင်း</div>
+<div class="fare"><span id="fare">3000</span> ကျပ်</div>
   <div class="fare"><span id="fare">0</span> ကျပ်</div>
   <div class="buttons">
     <button id="start" class="start">▶ START</button>
