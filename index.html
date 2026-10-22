@@ -109,8 +109,16 @@
     .start { background: var(--green); color: white; }
     .pause { background: var(--amber); color: white; }
     .stop { background: var(--red); color: white; }
-    .reset-row { display: flex; justify-content: center; margin: 12px 0 0; }
-    .reset { min-height: 40px; max-width: 220px; background: #e2e8f0; color: #334155; font-size: 13px; }
+    .reset-row { display: flex; align-items: stretch; gap: 7px; margin: 12px 0 0; }
+    .reset-row button { flex: 1 1 0; min-width: 0; min-height: 42px; padding: 8px 5px; font-size: 12px; border-radius: 11px; }
+    .reset { background: #e2e8f0; color: #334155; }
+    .passenger-btn { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+    .passenger-btn.active { background: #dbeafe; color: #1d4ed8; border: 2px solid #2563eb; }
+    .passenger-btn:disabled { opacity: .55; }
+    @media (max-width: 370px) {
+      .reset-row { gap: 4px; }
+      .reset-row button { font-size: 11px; padding: 7px 3px; }
+    }
     .map-toggle {
       width: 100%;
       margin-top: 15px;
@@ -220,7 +228,9 @@
       <button id="stop" class="stop" type="button" disabled>■ STOP</button>
     </div>
     <div class="reset-row">
+      <button id="passengers4" class="passenger-btn" type="button" aria-pressed="false">၄ ယောက်</button>
       <button id="reset" class="reset" type="button">RESET · ခရီးအသစ်</button>
+      <button id="passengers5" class="passenger-btn" type="button" aria-pressed="false">၅ ယောက်</button>
     </div>
 
     <button id="mapToggle" class="map-toggle" type="button" aria-expanded="false" aria-controls="mapPanel">🗺 မြေပုံကြည့်ရန်</button>
@@ -231,7 +241,7 @@
   </section>
 
   <p class="note">
-    အသုံးပြုရန် — အပြင်ဘက်တွင် GPS signal ကောင်းချိန် START နှိပ်ပါ။ လမ်းတွင် ရပ်နားရန် PAUSE နှိပ်ပါ (မိနစ် ၂၀ ကျော်ပါက ၁ မိနစ် ၁၀၀ နှုန်းဖြင့် စောင့်ခ တွက်ပါမည်)။ မြေပုံ © OpenStreetMap contributors[cite: 2]။
+    အသုံးပြုရန် — အပြင်ဘက်တွင် GPS signal ကောင်းချိန် START နှိပ်ပါ။ လမ်းတွင် ရပ်နားရန် PAUSE နှိပ်ပါ (မိနစ် ၂၀ ကျော်ပါက ၁ မိနစ် ၁၀၀ နှုန်းဖြင့် စောင့်ခ တွက်ပါမည်)။ မြေပုံ © OpenStreetMap contributors။
   </p>
 </main>
 
@@ -247,7 +257,7 @@
       <button id="saveSettings" class="save" type="button">သိမ်းမည်</button>
       <button id="closeSettings" class="close" type="button">ပိတ်မည်</button>
     </div>
-    <p class="settings-note">ဈေးနှုန်းများကို ဒီဖုန်း၏ Browser ထဲတွင် သိမ်းဆည်းထားပါမည်[cite: 2]။</p>
+    <p class="settings-note">ဈေးနှုန်းများကို ဒီဖုန်း၏ Browser ထဲတွင် သိမ်းဆည်းထားပါမည်။</p>
   </div>
 </div>
 
@@ -273,10 +283,10 @@
   const DEFAULT_BASE_FARE = 3000;
   const DEFAULT_RATE = 1500;
 
-  const MIN_ACCURACY = 35;
-  const MIN_MOVEMENT = 1.5;
-  const MAX_SPEED_MPS = 15;
-  const MAX_GAP_SECONDS = 25;    
+const MIN_ACCURACY = 35;
+const MIN_MOVEMENT = 1.5;
+const MAX_SPEED_MPS = 15;
+const MAX_GAP_SECONDS = 25;    
 
   const $ = id => document.getElementById(id);
   const fmt = n => Math.round(n).toLocaleString('en-US');
@@ -315,11 +325,12 @@
   let running = false;
   let isPaused = false;
   let tripStarted = false;
+  let passengerCount = 3;
   let totalMeters = 0;
   let waitingSeconds = 0;
   let waitingTimer = null;
   let waitingStartedAt = null;
-  const TRIP_STATE_KEY = 'kiloPausedTripState';
+const TRIP_STATE_KEY = 'kiloPausedTripState';
   let lastPoint = null;
   let routePoints = [];
   let marker = null;
@@ -328,42 +339,49 @@
 
   function setStatus(message) { $('status').textContent = message; }
 
-  function getCurrentWaitingSeconds() {
-    if (isPaused && waitingStartedAt !== null) {
-      return waitingSeconds +
-        Math.max(0, Math.floor((Date.now() - waitingStartedAt) / 1000));
+  
+function getCurrentWaitingSeconds() {
+  if (isPaused && waitingStartedAt !== null) {
+    return waitingSeconds +
+      Math.max(0, Math.floor((Date.now() - waitingStartedAt) / 1000));
+  }
+  return waitingSeconds;
+}
+
+function savePausedTripState() {
+  try {
+    if (running && isPaused && waitingStartedAt !== null) {
+      localStorage.setItem(TRIP_STATE_KEY, JSON.stringify({
+        totalMeters,
+        waitingSeconds,
+        waitingStartedAt,
+        tripStarted,
+        passengerCount,
+        baseFare,
+        rate
+      }));
+    } else {
+      localStorage.removeItem(TRIP_STATE_KEY);
     }
-    return waitingSeconds;
-  }
+  } catch {}
+}
 
-  function savePausedTripState() {
-    try {
-      if (running && isPaused && waitingStartedAt !== null) {
-        localStorage.setItem(TRIP_STATE_KEY, JSON.stringify({
-          totalMeters,
-          waitingSeconds,
-          waitingStartedAt,
-          tripStarted,
-          baseFare,
-          rate
-        }));
-      } else {
-        localStorage.removeItem(TRIP_STATE_KEY);
-      }
-    } catch {}
-  }
+function calculateCurrentFare() {
+  const currentSeconds = getCurrentWaitingSeconds();
+  const waitingMinutes = Math.floor(currentSeconds / 60);
+  const chargeableWaitingMins = Math.max(0, waitingMinutes - 20);
+  const waitingCost = chargeableWaitingMins * 100;
+  const baseDistanceCost =
+    (tripStarted ? baseFare : 0) +
+    (totalMeters / 1000) * rate;
+  const passengerMultiplier = passengerCount === 4 ? 1.20 :
+    passengerCount === 5 ? 1.40 : 1;
 
-  function calculateCurrentFare() {
-    const currentSeconds = getCurrentWaitingSeconds();
-    const waitingMinutes = Math.floor(currentSeconds / 60);
-    const chargeableWaitingMins = Math.max(0, waitingMinutes - 20);
-    const waitingCost = chargeableWaitingMins * 100;
-    const distanceCost =
-      (tripStarted ? baseFare : 0) +
-      (totalMeters / 1000) * rate;
+  // ခရီးသည်အပိုကြေးကို ပုံမှန်ခ (စတင်ခ + အကွာအဝေးခ) အပေါ်တွက်သည်။
+  // စောင့်ဆိုင်းခကို သီးခြားထားသည်။
+  return (baseDistanceCost * passengerMultiplier) + waitingCost;
+}
 
-    return distanceCost + waitingCost;
-  }
 
   function render() {
     const km = totalMeters / 1000;
@@ -371,14 +389,14 @@
     
     const currentWaitingSeconds = getCurrentWaitingSeconds();
 
-    const hrs = Math.floor(currentWaitingSeconds / 3600);
-    const mins = Math.floor((currentWaitingSeconds % 3600) / 60);
-    const secs = currentWaitingSeconds % 60;
+const hrs = Math.floor(currentWaitingSeconds / 3600);
+const mins = Math.floor((currentWaitingSeconds % 3600) / 60);
+const secs = currentWaitingSeconds % 60;
 
-    const waitingMinutesTotal = Math.floor(currentWaitingSeconds / 60);
-    const chargeableWaitingMins = Math.max(0, waitingMinutesTotal - 20);
-    const waitingCost = chargeableWaitingMins * 100;
-    const totalFare = calculateCurrentFare();
+const waitingMinutesTotal = Math.floor(currentWaitingSeconds / 60);
+const chargeableWaitingMins = Math.max(0, waitingMinutesTotal - 20);
+const waitingCost = chargeableWaitingMins * 100;
+const totalFare = calculateCurrentFare();
     
     $('fare').textContent = fmt(totalFare);
     
@@ -428,10 +446,8 @@
     }
   }
 
-  
   function showPosition(position) {
     if (isPaused || !running) return;
-
     const c = position.coords;
     const point = {
       lat: c.latitude,
@@ -441,17 +457,12 @@
     };
 
     updateMarker(point);
-
-    $('gpsInfo').innerHTML =
-      'GPS တိကျမှု: ခန့်မှန်း ' +
+    $('gpsInfo').innerHTML = 'GPS တိကျမှု: ခန့်မှန်း ' +
       (Number.isFinite(c.accuracy) ? Math.round(c.accuracy) : '—') +
       ' မီတာ<br>GPS တိုင်းတာနေသည်။';
 
-    if (
-      !Number.isFinite(point.accuracy) ||
-      point.accuracy <= 0 ||
-      point.accuracy > MIN_ACCURACY
-    ) {
+    if (!Number.isFinite(point.accuracy) || point.accuracy <= 0 ||
+        point.accuracy > MIN_ACCURACY) {
       setStatus('GPS signal မတိကျသေးပါ။ ပိုကောင်းတဲ့ GPS ကို စောင့်နေသည်။');
       return;
     }
@@ -460,56 +471,39 @@
       lastPoint = point;
       routePoints.push([point.lat, point.lng]);
       updateRoute();
-
-      if (map) {
-        map.setView([point.lat, point.lng], 17);
-      }
-
+      if (map) map.setView([point.lat, point.lng], 17);
       setStatus('GPS ရရှိပါပြီ။ ခရီးအကွာအဝေးကို တိုင်းတာနေသည်။');
       return;
     }
 
     const elapsed = (point.time - lastPoint.time) / 1000;
-
-    if (elapsed <= 0) {
+    if (elapsed <= 0 || elapsed > MAX_GAP_SECONDS) {
       lastPoint = point;
+      setStatus('GPS ခဏပြတ်တောက်သွားသည်။ တည်နေရာအသစ်မှ ဆက်တိုင်းတာနေသည်။');
       return;
     }
 
     const delta = distanceBetween(lastPoint, point);
-
     const accuracyThreshold = Math.max(
       MIN_MOVEMENT,
-      Math.min(
-        5,
-        (lastPoint.accuracy + point.accuracy) * 0.25
-      )
+      Math.min(5, (lastPoint.accuracy + point.accuracy) * 0.25)
     );
-
     const speed = delta / elapsed;
 
-    if (speed > MAX_SPEED_MPS) {
+    if (delta >= accuracyThreshold && speed <= MAX_SPEED_MPS) {
+      totalMeters += delta;
+      routePoints.push([point.lat, point.lng]);
+      updateRoute();
+      lastPoint = point;
+      render();
+    } else if (speed > MAX_SPEED_MPS) {
       lastPoint = point;
       setStatus('GPS တည်နေရာခုန်သွားမှုကို ဖယ်ထားပါသည်။');
       return;
     }
 
-    if (elapsed > MAX_GAP_SECONDS) {
-      setStatus('GPS ခဏပြတ်တောက်ခဲ့သည်။ တည်နေရာအသစ်မှ ဆက်တိုင်းတာနေသည်။');
-    }
-
-    if (delta >= accuracyThreshold) {
-      totalMeters += delta;
-      routePoints.push([point.lat, point.lng]);
-      updateRoute();
-      render();
-    }
-
-    lastPoint = point;
-
     setStatus('ခရီးစတင်ထားသည်။ GPS တိုင်းတာနေသည်။');
   }
-
 
   function gpsError(error) {
     let message = 'GPS မရပါ။ Location ခွင့်ပြုချက်နှင့် ဖုန်း၏ Location ကို စစ်ပါ။';
@@ -521,20 +515,6 @@
       message = 'GPS တုံ့ပြန်ချိန်ကုန်သွားသည်။ ထပ်မံကြိုးစားပါ။';
     }
     setStatus(message);
-  }
-
-  function startWatching() {
-    if (watchId !== null || !navigator.geolocation) return;
-
-    watchId = navigator.geolocation.watchPosition(
-      showPosition,
-      gpsError,
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 20000
-      }
-    );
   }
 
   function stopWatching() {
@@ -575,9 +555,11 @@
     }
   });
 
+  
   function openSettings() {
     $('baseFareInput').value = String(baseFare);
-    $('rateInput').value = String(rate);$('settingsPanel').classList.add('open');
+    $('rateInput').value = String(rate);
+    $('settingsPanel').classList.add('open');
   }
 
   function closeSettings() {
@@ -629,20 +611,24 @@
       const waitText = document.createElement('span');
       waitText.textContent =
         'စောင့်ချိန် ' + Math.floor((item.waitingSeconds || 0) / 60) + ' မိနစ်';
+      const passengerText = document.createElement('span');
+      passengerText.textContent = (item.passengers || 3) + ' ယောက်';
 
-      details.append(distanceText, waitText);
+      details.append(distanceText, passengerText, waitText);
       card.append(heading, details);
       list.appendChild(card);
     });
   }
 
-  $('settingsBtn').addEventListener('click', openSettings);$('closeSettings').addEventListener('click', closeSettings);
+  $('settingsBtn').addEventListener('click', openSettings);
+  $('closeSettings').addEventListener('click', closeSettings);
 
   $('settingsPanel').addEventListener('click', event => {
     if (event.target === $('settingsPanel')) closeSettings();
   });
 
-  $('historyBtn').addEventListener('click', openHistory);$('closeHistory').addEventListener('click', closeHistory);
+  $('historyBtn').addEventListener('click', openHistory);
+  $('closeHistory').addEventListener('click', closeHistory);
 
   $('historyPanel').addEventListener('click', event => {
     if (event.target === $('historyPanel')) closeHistory();
@@ -656,7 +642,7 @@
     tripHistory = [];
     saveHistoryToStorage(tripHistory);
     renderHistory();
-    setStatus('ခရီးစဉ်မှတ်တမ်းများကို ဖျက်ပြီးပါပြီ[cite: 2].');
+    setStatus('ခရီးစဉ်မှတ်တမ်းများကို ဖျက်ပြီးပါပြီ။');
   });
 
   document.addEventListener('keydown', event => {
@@ -694,32 +680,61 @@
 
     render();
     closeSettings();
-    setStatus('ဈေးနှုန်းများကို သိမ်းပြီးပါပြီ[cite: 2].');
+    setStatus('ဈေးနှုန်းများကို သိမ်းပြီးပါပြီ။');
   });
 
-  function beginWaiting() {
-    if (waitingTimer) clearInterval(waitingTimer);
+  
+function beginWaiting() {
+  if (waitingTimer) clearInterval(waitingTimer);
 
-    waitingTimer = setInterval(() => {
-      if (!running || !isPaused) return;
-      render();
-    }, 1000);
-  }
-
-  function endWaiting() {
-    if (isPaused && waitingStartedAt !== null) {
-      waitingSeconds = getCurrentWaitingSeconds();
-      waitingStartedAt = null;
-    }
-
-    if (waitingTimer) {
-      clearInterval(waitingTimer);
-      waitingTimer = null;
-    }
-
-    savePausedTripState();
+  waitingTimer = setInterval(() => {
+    if (!running || !isPaused) return;
     render();
+  }, 1000);
+}
+
+function endWaiting() {
+  if (isPaused && waitingStartedAt !== null) {
+    waitingSeconds = getCurrentWaitingSeconds();
+    waitingStartedAt = null;
   }
+
+  if (waitingTimer) {
+    clearInterval(waitingTimer);
+    waitingTimer = null;
+  }
+
+  savePausedTripState();
+  render();
+}
+
+  function updatePassengerButtons() {
+    const button4 = $('passengers4');
+    const button5 = $('passengers5');
+    button4.classList.toggle('active', passengerCount === 4);
+    button5.classList.toggle('active', passengerCount === 5);
+    button4.setAttribute('aria-pressed', String(passengerCount === 4));
+    button5.setAttribute('aria-pressed', String(passengerCount === 5));
+    // ခရီးစပြီးနောက် အလယ်ခရီးတွင် ရာခိုင်နှုန်းပြောင်းမသွားစေရန် ပိတ်ထားသည်။
+    button4.disabled = running || tripStarted;
+    button5.disabled = running || tripStarted;
+  }
+
+  $('passengers4').addEventListener('click', () => {
+    if (running || tripStarted) return;
+    passengerCount = 4;
+    updatePassengerButtons();
+    render();
+    setStatus('ခရီးသည် ၄ ယောက်ကို ရွေးထားသည်။');
+  });
+
+  $('passengers5').addEventListener('click', () => {
+    if (running || tripStarted) return;
+    passengerCount = 5;
+    updatePassengerButtons();
+    render();
+    setStatus('ခရီးသည် ၅ ယောက်ကို ရွေးထားသည်။');
+  });
 
   $('start').addEventListener('click', () => {
     if (running || tripStarted) return;
@@ -741,6 +756,7 @@
 
       tripStarted = true;
       running = true;
+      updatePassengerButtons();
 
       $('pause').disabled = false;
       $('pause').textContent = '⏸ PAUSE';
@@ -749,7 +765,16 @@
 
       render();
       showPosition(position);
-      startWatching();
+
+      watchId = navigator.geolocation.watchPosition(
+        showPosition,
+        gpsError,
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 20000
+        }
+      );
     }, error => {
       $('start').disabled = false;
       gpsError(error);
@@ -765,9 +790,9 @@
 
     if (!isPaused) {
       isPaused = true;
-      lastPoint = null;
-      waitingStartedAt = Date.now();
-      savePausedTripState();
+lastPoint = null;
+waitingStartedAt = Date.now();
+savePausedTripState();
 
       $('pause').textContent = '▶ RESUME';
       setStatus('ခရီးရပ်နားထားသည်။ စောင့်ဆိုင်းချိန်ကို တွက်နေသည်။');
@@ -776,11 +801,21 @@
       beginWaiting();
     } else {
       endWaiting();
-      isPaused = false;
-      lastPoint = null;
-      savePausedTripState();
-      startWatching();
+isPaused = false;
+lastPoint = null;
+savePausedTripState();
 
+if (navigator.geolocation) {
+  watchId = navigator.geolocation.watchPosition(
+    showPosition,
+    gpsError,
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000
+    }
+  );
+}
       $('pause').textContent = '⏸ PAUSE';
       setStatus('ခရီးပြန်စပါပြီ။ GPS အကွာအဝေးကို ဆက်တိုင်းတာနေသည်။');
       $('gpsInfo').textContent = 'GPS တည်နေရာအသစ်ကို စောင့်နေသည်။';
@@ -797,12 +832,7 @@
 
     running = false;
     isPaused = false;
-    waitingStartedAt = null;
     lastPoint = null;
-
-    try {
-      localStorage.removeItem(TRIP_STATE_KEY);
-    } catch {}
 
     $('start').disabled = true;
     $('pause').disabled = true;
@@ -814,6 +844,7 @@
       date: new Date().toLocaleString(),
       km: totalMeters / 1000,
       waitingSeconds,
+      passengers: passengerCount,
       fare: calculateCurrentFare()
     };
 
@@ -821,7 +852,7 @@
     saveHistoryToStorage(tripHistory);
 
     render();
-    setStatus('ခရီးပြီးဆုံးပါပြီ။ မှတ်တမ်းကို သိမ်းပြီးပါပြီ[cite: 2].');
+    setStatus('ခရီးပြီးဆုံးပါပြီ။ မှတ်တမ်းကို သိမ်းပြီးပါပြီ။');
     $('gpsInfo').textContent = 'GPS တိုင်းတာမှု ရပ်ထားသည်။';
   });
 
@@ -833,15 +864,11 @@
 
     totalMeters = 0;
     waitingSeconds = 0;
-    waitingStartedAt = null;
     tripStarted = false;
+    passengerCount = 3;
     isPaused = false;
-    running = false;
     lastPoint = null;
-
-    try {
-      localStorage.removeItem(TRIP_STATE_KEY);
-    } catch {}
+    updatePassengerButtons();
 
     clearRoute();
 
@@ -864,48 +891,55 @@
   window.addEventListener('pagehide', () => {
     stopWatching();
   });
+  
+function restorePausedTripState() {
+  try {
+    const raw = localStorage.getItem(TRIP_STATE_KEY);
+    if (!raw) return;
 
-  function restorePausedTripState() {
-    try {
-      const raw = localStorage.getItem(TRIP_STATE_KEY);
-      if (!raw) return;
+    const saved = JSON.parse(raw);
 
-      const saved = JSON.parse(raw);
-
-      if (
-        !Number.isFinite(saved.waitingStartedAt) ||
-        !Number.isFinite(saved.waitingSeconds) ||
-        !Number.isFinite(saved.totalMeters)
-      ) {
-        localStorage.removeItem(TRIP_STATE_KEY);
-        return;
-      }
-
-      totalMeters = saved.totalMeters;
-      waitingSeconds = saved.waitingSeconds;
-      waitingStartedAt = saved.waitingStartedAt;
-      tripStarted = true;
-      running = true;
-      isPaused = true;
-
-      $('start').disabled = true;
-      $('pause').disabled = false;
-      $('pause').textContent = '▶ RESUME';
-      $('stop').disabled = false;
-      $('reset').disabled = true;
-
-      setStatus('ယခင်ခရီးစဉ်ကို ပြန်ယူထားသည်။ စောင့်ဆိုင်းချိန်ကို ဆက်တွက်နေသည်။');
-
-      beginWaiting();
-      savePausedTripState();
-    } catch {
-      try {
-        localStorage.removeItem(TRIP_STATE_KEY);
-      } catch {}
+    if (
+      !Number.isFinite(saved.waitingStartedAt) ||
+      !Number.isFinite(saved.waitingSeconds) ||
+      !Number.isFinite(saved.totalMeters)
+    ) {
+      localStorage.removeItem(TRIP_STATE_KEY);
+      return;
     }
-  }
 
-  restorePausedTripState();
+    totalMeters = saved.totalMeters;
+    waitingSeconds = saved.waitingSeconds;
+    waitingStartedAt = saved.waitingStartedAt;
+    passengerCount = saved.passengerCount === 4 || saved.passengerCount === 5
+      ? saved.passengerCount : 3;
+    tripStarted = true;
+    running = true;
+    updatePassengerButtons();
+    isPaused = true;
+
+    $('start').disabled = true;
+    $('pause').disabled = false;
+    $('pause').textContent = '▶ RESUME';
+    $('stop').disabled = false;
+    $('reset').disabled = true;
+
+    setStatus('ယခင်ခရီးစဉ်ကို ပြန်ယူထားသည်။ စောင့်ဆိုင်းချိန်ကို ဆက်တွက်နေသည်။');
+
+    beginWaiting();
+    savePausedTripState();
+  } catch {
+    try {
+      localStorage.removeItem(TRIP_STATE_KEY);
+    } catch {}
+  }
+}
+
+restorePausedTripState();
+updatePassengerButtons();
+render();
+
+
   render();
 })();
 </script>
