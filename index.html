@@ -249,8 +249,9 @@
 <div id="settingsPanel" class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
   <div class="modal-card">
     <h2 id="settingsTitle">⚙ ဈေးနှုန်းသတ်မှတ်ရန်</h2>
-    <label class="field-label" for="baseFareInput">စတက်ခ (ကျပ်)</label>
-    <input id="baseFareInput" class="field" type="number" min="0" step="100" value="3000" inputmode="numeric">
+    <label class="field-label" for="baseFareInput">စတက်ခ (ကျပ်) — ပုံသေ</label>
+    <input id="baseFareInput" class="field" type="number" value="3000" disabled aria-describedby="baseFareNote">
+    <p class="settings-note" id="baseFareNote" style="margin-top:-10px">စတက်ခကို ၃,၀၀၀ ကျပ် ပုံသေသတ်မှတ်ထားပါသည်။</p>
     <label class="field-label" for="rateInput">တစ်ကီလိုနှုန်း (ကျပ် / km)</label>
     <input id="rateInput" class="field" type="number" min="0" step="100" value="1500" inputmode="numeric">
     <div class="modal-actions">
@@ -317,7 +318,7 @@ const MAX_GAP_SECONDS = 25;
     } catch {}
   }
 
-  let baseFare = loadSetting('kiloBaseFare', DEFAULT_BASE_FARE);
+  const baseFare = DEFAULT_BASE_FARE;
   let rate = loadSetting('kiloRate', DEFAULT_RATE);
   let tripHistory = loadHistory();
 
@@ -371,15 +372,14 @@ function calculateCurrentFare() {
   const waitingMinutes = Math.floor(currentSeconds / 60);
   const chargeableWaitingMins = Math.max(0, waitingMinutes - 20);
   const waitingCost = chargeableWaitingMins * 100;
-  const baseDistanceCost =
-    (tripStarted ? baseFare : 0) +
-    (totalMeters / 1000) * rate;
+  const baseFareAmount = tripStarted ? baseFare : 0;
+  const distanceCost = (totalMeters / 1000) * rate;
   const passengerMultiplier = passengerCount === 4 ? 1.20 :
     passengerCount === 5 ? 1.40 : 1;
 
-  // ခရီးသည်အပိုကြေးကို ပုံမှန်ခ (စတင်ခ + အကွာအဝေးခ) အပေါ်တွက်သည်။
-  // စောင့်ဆိုင်းခကို သီးခြားထားသည်။
-  return (baseDistanceCost * passengerMultiplier) + waitingCost;
+  // စတက်ခ ၃,၀၀၀ ကျပ်ကို ပုံသေထားပြီး Kilo ခကိုသာ ရာခိုင်နှုန်းတိုးတွက်သည်။
+  // စောင့်ဆိုင်းခကို သီးခြားပေါင်းသည်။
+  return baseFareAmount + (distanceCost * passengerMultiplier) + waitingCost;
 }
 
 
@@ -557,7 +557,7 @@ const totalFare = calculateCurrentFare();
 
   
   function openSettings() {
-    $('baseFareInput').value = String(baseFare);
+    $('baseFareInput').value = String(DEFAULT_BASE_FARE);
     $('rateInput').value = String(rate);
     $('settingsPanel').classList.add('open');
   }
@@ -653,28 +653,22 @@ const totalFare = calculateCurrentFare();
   });
 
   $('saveSettings').addEventListener('click', () => {
-    const baseRaw = $('baseFareInput').value.trim();
     const rateRaw = $('rateInput').value.trim();
-    const newBase = Number(baseRaw);
     const newRate = Number(rateRaw);
 
     if (
-      baseRaw === '' ||
       rateRaw === '' ||
-      !Number.isFinite(newBase) ||
       !Number.isFinite(newRate) ||
-      newBase < 0 ||
       newRate < 0
     ) {
-      alert('စတက်ခနဲ့ တစ်ကီလိုနှုန်းကို မှန်ကန်စွာ ထည့်ပါ။');
+      alert('တစ်ကီလိုနှုန်းကို မှန်ကန်စွာ ထည့်ပါ။');
       return;
     }
 
-    baseFare = newBase;
     rate = newRate;
 
     try {
-      localStorage.setItem('kiloBaseFare', String(baseFare));
+      localStorage.setItem('kiloBaseFare', String(DEFAULT_BASE_FARE));
       localStorage.setItem('kiloRate', String(rate));
     } catch {}
 
