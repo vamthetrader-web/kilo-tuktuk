@@ -428,8 +428,10 @@
     }
   }
 
+  
   function showPosition(position) {
     if (isPaused || !running) return;
+
     const c = position.coords;
     const point = {
       lat: c.latitude,
@@ -439,12 +441,17 @@
     };
 
     updateMarker(point);
-    $('gpsInfo').innerHTML = 'GPS တိကျမှု: ခန့်မှန်း ' +
+
+    $('gpsInfo').innerHTML =
+      'GPS တိကျမှု: ခန့်မှန်း ' +
       (Number.isFinite(c.accuracy) ? Math.round(c.accuracy) : '—') +
       ' မီတာ<br>GPS တိုင်းတာနေသည်။';
 
-    if (!Number.isFinite(point.accuracy) || point.accuracy <= 0 ||
-        point.accuracy > MIN_ACCURACY) {
+    if (
+      !Number.isFinite(point.accuracy) ||
+      point.accuracy <= 0 ||
+      point.accuracy > MIN_ACCURACY
+    ) {
       setStatus('GPS signal မတိကျသေးပါ။ ပိုကောင်းတဲ့ GPS ကို စောင့်နေသည်။');
       return;
     }
@@ -453,71 +460,56 @@
       lastPoint = point;
       routePoints.push([point.lat, point.lng]);
       updateRoute();
-      if (map) map.setView([point.lat, point.lng], 17);
+
+      if (map) {
+        map.setView([point.lat, point.lng], 17);
+      }
+
       setStatus('GPS ရရှိပါပြီ။ ခရီးအကွာအဝေးကို တိုင်းတာနေသည်။');
       return;
     }
 
-    
-const elapsed = (point.time - lastPoint.time) / 1000;
+    const elapsed = (point.time - lastPoint.time) / 1000;
 
-if (elapsed <= 0) {
-  lastPoint = point;
-  return;
-}
-
-if (elapsed > MAX_GAP_SECONDS) {
-  setStatus('GPS ခဏပြတ်တောက်ခဲ့သည်။ အကွာအဝေးကို ပြန်စစ်ဆေးနေသည်။');
-}
-
-// GPS point နှစ်ခုကြား အကွာအဝေးကို ဆက်လက်စစ်ဆေးမည်။
-const delta = distanceBetween(lastPoint, point);
-
-const accuracyThreshold = Math.max(
-  MIN_MOVEMENT,
-  Math.min(5, (lastPoint.accuracy + point.accuracy) * 0.25)
-);
-
-const speed = delta / elapsed;
-
-if (speed > MAX_SPEED_MPS) {
-  lastPoint = point;
-  setStatus('GPS တည်နေရာခုန်သွားမှုကို ဖယ်ထားပါသည်။');
-  return;
-}
-
-if (delta >= accuracyThreshold) {
-  totalMeters += delta;
-  routePoints.push([point.lat, point.lng]);
-  updateRoute();
-  render();
-}
-
-lastPoint = point;
-setStatus('ခရီးစတင်ထားသည်။ GPS တိုင်းတာနေသည်။');
-
+    if (elapsed <= 0) {
+      lastPoint = point;
+      return;
+    }
 
     const delta = distanceBetween(lastPoint, point);
+
     const accuracyThreshold = Math.max(
       MIN_MOVEMENT,
-      Math.min(5, (lastPoint.accuracy + point.accuracy) * 0.25)
+      Math.min(
+        5,
+        (lastPoint.accuracy + point.accuracy) * 0.25
+      )
     );
+
     const speed = delta / elapsed;
 
-    if (delta >= accuracyThreshold && speed <= MAX_SPEED_MPS) {
-      totalMeters += delta;
-      routePoints.push([point.lat, point.lng]);
-      updateRoute();
-      lastPoint = point;
-      render();
-    } else if (speed > MAX_SPEED_MPS) {
+    if (speed > MAX_SPEED_MPS) {
       lastPoint = point;
       setStatus('GPS တည်နေရာခုန်သွားမှုကို ဖယ်ထားပါသည်။');
       return;
     }
 
+    if (elapsed > MAX_GAP_SECONDS) {
+      setStatus('GPS ခဏပြတ်တောက်ခဲ့သည်။ တည်နေရာအသစ်မှ ဆက်တိုင်းတာနေသည်။');
+    }
+
+    if (delta >= accuracyThreshold) {
+      totalMeters += delta;
+      routePoints.push([point.lat, point.lng]);
+      updateRoute();
+      render();
+    }
+
+    lastPoint = point;
+
     setStatus('ခရီးစတင်ထားသည်။ GPS တိုင်းတာနေသည်။');
   }
+
 
   function gpsError(error) {
     let message = 'GPS မရပါ။ Location ခွင့်ပြုချက်နှင့် ဖုန်း၏ Location ကို စစ်ပါ။';
