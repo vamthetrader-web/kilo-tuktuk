@@ -458,12 +458,44 @@
       return;
     }
 
-    const elapsed = (point.time - lastPoint.time) / 1000;
-    if (elapsed <= 0 || elapsed > MAX_GAP_SECONDS) {
-      lastPoint = point;
-      setStatus('GPS ခဏပြတ်တောက်သွားသည်။ တည်နေရာအသစ်မှ ဆက်တိုင်းတာနေသည်။');
-      return;
-    }
+    
+const elapsed = (point.time - lastPoint.time) / 1000;
+
+if (elapsed <= 0) {
+  lastPoint = point;
+  return;
+}
+
+if (elapsed > MAX_GAP_SECONDS) {
+  setStatus('GPS ခဏပြတ်တောက်ခဲ့သည်။ အကွာအဝေးကို ပြန်စစ်ဆေးနေသည်။');
+}
+
+// GPS point နှစ်ခုကြား အကွာအဝေးကို ဆက်လက်စစ်ဆေးမည်။
+const delta = distanceBetween(lastPoint, point);
+
+const accuracyThreshold = Math.max(
+  MIN_MOVEMENT,
+  Math.min(5, (lastPoint.accuracy + point.accuracy) * 0.25)
+);
+
+const speed = delta / elapsed;
+
+if (speed > MAX_SPEED_MPS) {
+  lastPoint = point;
+  setStatus('GPS တည်နေရာခုန်သွားမှုကို ဖယ်ထားပါသည်။');
+  return;
+}
+
+if (delta >= accuracyThreshold) {
+  totalMeters += delta;
+  routePoints.push([point.lat, point.lng]);
+  updateRoute();
+  render();
+}
+
+lastPoint = point;
+setStatus('ခရီးစတင်ထားသည်။ GPS တိုင်းတာနေသည်။');
+
 
     const delta = distanceBetween(lastPoint, point);
     const accuracyThreshold = Math.max(
